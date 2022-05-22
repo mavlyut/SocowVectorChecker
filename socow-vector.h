@@ -191,7 +191,7 @@ struct socow_vector {
 
     iterator erase(const_iterator first, const_iterator last) {
         ptrdiff_t count = last - first;
-        ptrdiff_t start = first - begin();
+        ptrdiff_t start = first - my_begin();
         for (size_t i = start; i < _size - count; i++) {
             std::swap(operator[](i), operator[](i + count));
         }
@@ -200,8 +200,6 @@ struct socow_vector {
         }
         return begin() + start;
     }
-
-    bool is_small;
 
 private:
     iterator my_begin() {
@@ -321,6 +319,7 @@ private:
         control_block* ctrl;
     };
 
+    bool is_small;
     size_t _size;
     union {
         T small_storage[SMALL_SIZE];
