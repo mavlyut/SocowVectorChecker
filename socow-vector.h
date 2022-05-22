@@ -159,11 +159,11 @@ struct socow_vector {
     }
 
     const_iterator begin() const {
-        return my_begin();
+        return is_small ? small_storage : big_storage._data();
     }
 
     const_iterator end() const {
-        return my_end();
+        return begin() + _size;
     }
 
     iterator insert(const_iterator pos, T const& t) {
