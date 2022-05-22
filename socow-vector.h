@@ -155,7 +155,9 @@ struct socow_vector {
     }
 
     iterator end() {
-        return begin() + _size;
+        if (is_small) return small_storage + _size;
+        make_copy();
+        return big_storage._data() + _size;
     }
 
     const_iterator begin() const {
@@ -163,7 +165,7 @@ struct socow_vector {
     }
 
     const_iterator end() const {
-        return begin() + _size;
+        return (is_small ? small_storage : big_storage._data()) + _size;
     }
 
     iterator insert(const_iterator pos, T const& t) {
@@ -251,7 +253,7 @@ private:
     struct control_block {
         size_t _counter;
         size_t _capacity;
-        T _data[];
+        T _data[0];
     };
 
     struct storage {
