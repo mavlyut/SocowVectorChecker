@@ -10,7 +10,7 @@ struct socow_vector {
 
     socow_vector(socow_vector const& other) : _size(other._size), is_small(other.is_small) {
         if (other.is_small) {
-            copy(const_cast<T*>(other.small_storage), small_storage, other._size);
+            copy(other.small_storage, small_storage, other._size);
         } else {
             new(&big_storage) storage(other.big_storage);
         }
