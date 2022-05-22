@@ -119,7 +119,7 @@ struct socow_vector {
 
     void swap(socow_vector& other) {
         if (_size > other._size || !is_small && other.is_small) {
-            swap(other, *this);
+            other.swap(*this);
             return;
         }
         if (is_small && other.is_small) {
