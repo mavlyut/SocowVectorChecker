@@ -207,6 +207,7 @@ private:
         }
     }
 
+    // copy from `from` to `to` count elements from begin
     void copy(T const* from, T* to, size_t count) {
         size_t i = 0;
         try {
@@ -229,6 +230,7 @@ private:
         }
     }
 
+    // makes _size == new_capacity in `from`; after expand data is big
     void expand_storage(T const* from, size_t new_capacity) {
         if (!new_capacity) {
             _size = 0;
