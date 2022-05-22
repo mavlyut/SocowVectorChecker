@@ -102,9 +102,9 @@ struct socow_vector {
             expand_storage(my_begin(), capacity());
         }
     }
-
+    
     void shrink_to_fit() {
-        if (!is_small) expand_storage(small_storage, _size);
+        if (!is_small && _size != capacity()) expand_storage(small_storage, _size);
     }
 
     void clear() {
@@ -181,6 +181,7 @@ struct socow_vector {
         return erase(pos, pos + 1);
     }
 
+    // TODO: fix bugs
     iterator erase(const_iterator first, const_iterator last) {
         ptrdiff_t start = first - my_begin();
         ptrdiff_t count = last - my_begin();
