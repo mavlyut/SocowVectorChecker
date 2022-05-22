@@ -259,11 +259,9 @@ private:
     struct storage {
         storage() = default;
 
-        explicit storage(size_t capacity) :
-            ctrl(static_cast<control_block*>(operator new(sizeof(control_block) + sizeof(T) * capacity,
-                 static_cast<std::align_val_t>(alignof(control_block))))) {
-            new(&ctrl->_counter) size_t(1);
-            new(&ctrl->_capacity) size_t(capacity);
+        explicit storage(size_t capacity) : ctrl(static_cast<control_block*>(operator new(sizeof(control_block) + sizeof(T) * capacity, static_cast<std::align_val_t>(alignof(control_block))))) {
+            ctrl->_counter = 1;
+            ctrl->_capacity = capacity;
         }
 
         storage(storage const& other) : ctrl(other.ctrl) {
