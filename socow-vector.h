@@ -162,9 +162,7 @@ struct socow_vector {
     }
 
     iterator end() {
-        if (is_small) return small_storage + _size;
-        make_copy();
-        return big_storage._data() + _size;
+        return begin() + _size;
     }
 
     const_iterator begin() const {
@@ -172,7 +170,7 @@ struct socow_vector {
     }
 
     const_iterator end() const {
-        return (is_small ? small_storage : big_storage._data()) + _size;
+        return begin() + _size;
     }
 
     iterator insert(const_iterator pos, T const& t) {
