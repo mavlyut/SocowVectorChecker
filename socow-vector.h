@@ -25,12 +25,10 @@ struct socow_vector {
     }
 
     ~socow_vector() {
-        if (is_small) {
+        if (is_small || big_storage.is_unique()) {
             remove(my_begin(), my_end());
-        } else {
-            if (big_storage.is_unique()) {
-                remove(my_begin(), my_end());
-            }
+        }
+        if (!is_small) {
             big_storage.~storage();
         }
     }
@@ -104,7 +102,23 @@ struct socow_vector {
     }
 
     void shrink_to_fit() {
-        if (!is_small && _size != capacity()) expand_storage(small_storage, _size);
+        if (!is_small) {
+            if (_size <= SMALL_SIZE) {
+                storage tmp = big_storage;
+                big_storage.~storage();
+                try {
+                    copy(tmp._data(), small_storage, _size);
+                } catch (...) {
+                    new(&big_storage) storage(tmp);
+                    throw;
+                }
+                remove(tmp._data(), tmp._data() + _size);
+                is_small = true;
+            } else if (_size != capacity()) {
+                expand_storage(big_storage._data(), _size);
+            }
+        }
+//        if (!is_small && _size != capacity()) expand_storage(small_storage, _size);
     }
 
     void clear() {
@@ -185,13 +199,15 @@ struct socow_vector {
         ptrdiff_t count = last - first;
         ptrdiff_t start = first - begin();
         for (size_t i = start; i < _size - count; i++) {
-            std::swap(*(my_begin() + i), *(my_begin() + i + count));
+            std::swap(operator[](i), operator[](i + count));
         }
         for (size_t i = 0; i < count; ++i) {
             pop_back();
         }
         return begin() + start;
     }
+
+    bool is_small;
 
 private:
     iterator my_begin() {
@@ -312,7 +328,6 @@ private:
     };
 
     size_t _size;
-    bool is_small;
     union {
         T small_storage[SMALL_SIZE];
         storage big_storage;
