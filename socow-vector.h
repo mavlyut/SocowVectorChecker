@@ -291,7 +291,7 @@ private:
     struct metadata {
         size_t capacity_;
         size_t ref_counter;
-        T data_[];
+        T data_[0];
     };
 
     struct dynamic_buffer {
