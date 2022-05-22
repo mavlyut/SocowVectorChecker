@@ -1,6 +1,4 @@
 #pragma once
-
-#include <array>
 #include <cstddef>
 
 template <typename T, size_t SMALL_SIZE>
@@ -8,462 +6,323 @@ struct socow_vector {
     using iterator = T*;
     using const_iterator = T const*;
 
-    // O(1) nothrow
-    socow_vector(): is_small(true), size_(0) {}
+    socow_vector() : _size(0), is_small(true) {}
 
-    // O(SMALL_SIZE) basic | O(N) strong
-    socow_vector(socow_vector const& other) {
+    socow_vector(socow_vector const& other) : _size(other._size), is_small(other.is_small) {
         if (other.is_small) {
-            data_copy(other.small_data.begin(), other.size_, small_data.begin());
+            copy(const_cast<T*>(other.small_storage), small_storage, other._size);
         } else {
-            new (&big_data) buffer_storage(other.big_data);
+            new(&big_storage) storage(other.big_storage);
         }
-
-        size_ = other.size_;
-        is_small = other.is_small;
     }
 
-    // O(SMALL_SIZE) basic | O(N) strong
     socow_vector& operator=(socow_vector const& other) {
-        if (this != &other) {
+        if (&other != this) {
             socow_vector(other).swap(*this);
         }
         return *this;
     }
 
-    // O(N) nothrow
+    // todo: fix
     ~socow_vector() {
-        if (is_small) {
-            clear();
-        } else {
-            big_data.clear(size_);
-            big_data.~buffer_storage();
+        if (is_small || big_storage.is_unique()) {
+            remove(my_begin(), my_end());
+        }
+        if (!is_small) {
+            big_storage.~storage();
         }
     }
 
-    // O(1) nothrow | O(N) strong
     T& operator[](size_t i) {
-        if (is_small) {
-            return small_data[i];
-        } else {
-            big_data.own(size_);
-            return big_data.at(i);
-        }
+        return *(begin() + i);
     }
 
-    // O(1) nothrow
     T const& operator[](size_t i) const {
-        return is_small ? small_data[i] : big_data.at(i);
+        return *(begin() + i);
     }
 
-    // O(1) nothrow | O(N) strong
     T* data() {
-        if (is_small) {
-            return small_data.begin();
-        } else {
-            big_data.own(size_);
-            return big_data.data();
-        }
+        return begin();
     }
 
-    // O(1) nothrow
     T const* data() const {
-        return is_small ? small_data.begin() : big_data.data();
+        return begin();
     }
 
-    // O(1) nothrow
     size_t size() const {
-        return size_;
+        return _size;
     }
 
-    // O(1) nothrow | O(N) strong
     T& front() {
-        if (is_small) {
-            return small_data[0];
-        } else {
-            big_data.own(size_);
-            return big_data.at(0);
-        }
+        return *begin();
     }
 
-    // O(1) nothrow
     T const& front() const {
-        return is_small ? small_data[0] : big_data.at(0);
+        return *begin();
     }
 
-    // O(1) nothrow | O(N) strong
     T& back() {
-        if (is_small) {
-            return small_data[size_ - 1];
-        } else {
-            big_data.own(size_);
-            return big_data.at(size_ - 1);
-        }
+        return *(end() - 1);
     }
 
-    // O(1) nothrow
     T const& back() const {
-        return is_small ? small_data[size_ - 1] : big_data.at(size_ - 1);
+        return *(end() - 1);
     }
 
-    // O(1) strong
-    void push_back(T const& t) {
-        if (is_small && size_ < SMALL_SIZE) {
-            new (&small_data[size_]) T(t);
+    void push_back(T const& element) {
+        if (_size == capacity()) {
+            T tmp = element;
+            expand_storage(begin(), capacity() * 2);
+            new(begin() + _size) T(tmp);
         } else {
-            T temp(t);
-            if (is_small) {
-                small_to_big(2 * SMALL_SIZE);
-            } else {
-                big_data.own(size_, (size_ == capacity() ? 2 : 1) * capacity());
-            }
-            new (&(big_data.data()[size_])) T(temp);
+            new(begin() + _size) T(element);
         }
-
-        size_++;
+        ++_size;
     }
 
-    // O(1) nothrow | O(N) strong
     void pop_back() {
-        if (is_small) {
-            small_data[--size_].~T();
-        } else {
-            big_data.own(size_);
-            big_data.data()[--size_].~T();
-        }
+        (end() - 1)->~T();
+        --_size;
     }
 
-    // O(1) nothrow
     bool empty() const {
-        return size_ == 0;
+        return _size == 0;
     }
 
-    // O(1) nothrow
     size_t capacity() const {
-        return is_small ? SMALL_SIZE : big_data.capacity();
+        return is_small ? SMALL_SIZE : big_storage.capacity();
     }
 
-    // O(N) strong
     void reserve(size_t new_capacity) {
-        if (!is_small) {
-            big_data.own(size_, std::max(new_capacity, capacity()));
-        } else if (new_capacity > SMALL_SIZE) {
-            small_to_big(new_capacity);
+        if ((is_small && new_capacity > SMALL_SIZE) || (!is_small && new_capacity > capacity())) {
+            expand_storage(my_begin(), new_capacity);
+        } else if (!is_small && !big_storage.is_unique()) {
+            expand_storage(my_begin(), capacity());
         }
     }
 
-    // O(N) basic | string
     void shrink_to_fit() {
-        if (!is_small) {
-            if (size_ <= SMALL_SIZE) {
-                big_to_small();
-            } else {
-                big_data.own(size_, size_);
+        if (is_small) return;
+        if (_size <= SMALL_SIZE) {
+            storage tmp = big_storage;
+            big_storage.~storage();
+            try {
+                copy(tmp._data(), small_storage, _size);
+            } catch (...) {
+                new(&big_storage) storage(tmp);
+                throw;
             }
+            remove(tmp._data(), tmp._data() + _size);
+            is_small = true;
+        } else if (_size != capacity()) {
+            expand_storage(big_storage._data(), _size);
         }
     }
 
-    // O(N) nothrow
     void clear() {
         erase(begin(), end());
     }
 
-    // O(1) basic | strong
     void swap(socow_vector& other) {
+        if (_size > other._size || (!is_small && other.is_small)) {
+            other.swap(*this);
+            return;
+        }
         if (is_small && other.is_small) {
-            swap_smalls(*this, other);
+            for (size_t i = 0; i < _size; ++i) {
+                std::swap(small_storage[i], other.small_storage[i]);
+            }
+            for (size_t i = _size; i < other._size; ++i) {
+                new(small_storage + i) T(other.small_storage[i]);
+                other.small_storage[i].~T();
+            }
         } else if (!is_small && !other.is_small) {
-            big_data.swap(other.big_data);
-            std::swap(size_, other.size_);
-            std::swap(is_small, other.is_small);
-        } else if (is_small) {
-            swap_small_big(*this, other);
+            std::swap(big_storage, other.big_storage);
         } else {
-            swap_small_big(other, *this);
+            storage tmp = other.big_storage;
+            other.big_storage.~storage();
+            try {
+                copy(small_storage, other.small_storage, _size);
+            } catch (...) {
+                new(&other.big_storage) storage(tmp);
+                throw;
+            }
+            remove(my_begin(), my_end());
+            new(&big_storage) storage(tmp);
         }
+        std::swap(_size, other._size);
+        std::swap(is_small, other.is_small);
     }
 
-    // O(1) nothrow | O(N) strong
     iterator begin() {
-        if (is_small) {
-            return small_data.begin();
-        } else {
-            big_data.own(size_);
-            return big_data.data();
-        }
+        if (is_small) return small_storage;
+        make_copy();
+        return big_storage._data();
     }
 
-    // O(1) nothrow | O(N) strong
     iterator end() {
-        return begin() + size_;
+        if (is_small) return small_storage + _size;
+        make_copy();
+        return big_storage._data() + _size;
     }
 
-    // O(1) nothrow
     const_iterator begin() const {
-        return is_small ? small_data.begin() : big_data.data();
+        return is_small ? small_storage : big_storage._data();
     }
 
-    // O(1) nothrow
     const_iterator end() const {
-        return begin() + size_;
+        return (is_small ? small_storage : big_storage._data()) + _size;
     }
 
-    // O(N) strong
-    iterator insert(const_iterator pos, T const& val) {
-        ptrdiff_t ind = index(pos);
-        push_back(val);
-
-        for (size_t i = size_ - 1; i - ind > 0; i--) {
-            swap(i, i - 1);
+    iterator insert(const_iterator pos, T const& t) {
+        ptrdiff_t diff = pos - begin();
+        push_back(t);
+        for (size_t i = _size - 1; i > diff; --i) {
+            std::swap(*(my_begin() + i), *(my_begin() + i - 1));
         }
-
-        return begin() + ind;
+        return my_begin() + diff;
     }
 
-    // O(N) nothrow(swap) | strong
     iterator erase(const_iterator pos) {
         return erase(pos, pos + 1);
     }
 
-    // O(N) nothrow(swap) | strong
-    iterator erase(const_iterator first,
-                   const_iterator last) {
-        ptrdiff_t ind = index(first);
-
-        if (first <= last) {
-            ptrdiff_t swaps = last - first;
-
-            if (!is_small) {
-                big_data.own(size_);
-            }
-
-            for (size_t i = ind; i + swaps < size_; i++) {
-                swap(i, i + swaps);
-            }
-
-            while (swaps-- > 0) {
-                pop_back();
-            }
+    iterator erase(const_iterator first, const_iterator last) {
+        ptrdiff_t count = last - first;
+        ptrdiff_t start = first - begin();
+        for (size_t i = start; i < _size - count; i++) {
+            std::swap(operator[](i), operator[](i + count));
         }
-
-        return begin() + ind;
+        for (size_t i = 0; i < count; ++i) {
+            pop_back();
+        }
+        return begin() + start;
     }
 
+    bool is_small;
+
 private:
-    struct data_block {
-        size_t occurrences;
-        size_t capacity;
-        T data[];
+    iterator my_begin() {
+        return is_small ? small_storage : big_storage._data();
+    }
+
+    iterator my_end() {
+        return my_begin() + _size;
+    }
+
+    void make_copy() {
+        if (!is_small && !big_storage.is_unique()) {
+            expand_storage(big_storage._data(), capacity());
+        }
+    }
+
+    void copy(T const* from, T* to, size_t count) {
+        size_t i = 0;
+        try {
+            while (i < count) {
+                new(to + i) T(from[i]);
+                ++i;
+            }
+        } catch (...) {
+            remove(to, to + i);
+            throw;
+        }
+    }
+
+    void remove(T* start, T* end) {
+        if (start != nullptr) {
+            ptrdiff_t count = end - start;
+            for (ptrdiff_t i = count - 1; i >= 0; --i) {
+                (start + i)->~T();
+            }
+        }
+    }
+
+    void expand_storage(T const* from, size_t new_capacity) {
+        if (new_capacity == 0) {
+            _size = 0;
+            return;
+        }
+        storage tmp(new_capacity);
+        copy(from, tmp._data(), _size);
+        if (is_small || big_storage.is_unique()) {
+            remove(my_begin(), my_end());
+        }
+        if (!is_small) {
+            big_storage.~storage();
+        }
+        new(&big_storage) storage(tmp);
+        is_small = false;
+    }
+
+    struct control_block {
+        size_t _counter;
+        size_t _capacity;
+        T _data[0];
     };
 
-    struct buffer_storage {
-        // O(1) nothrow
-        buffer_storage() = default;
+    struct storage {
+        storage() = default;
 
-        // O(1) nothrow
-        buffer_storage(buffer_storage const& other): block(other.block) {
-            block->occurrences++;
+        explicit storage(size_t capacity) :
+            ctrl(static_cast<control_block*>(operator new(sizeof(control_block) + sizeof(T) * capacity,
+                 static_cast<std::align_val_t>(alignof(control_block))))) {
+            new(&ctrl->_counter) size_t(1);
+            new(&ctrl->_capacity) size_t(capacity);
         }
 
-        // O(1) nothrow
-        explicit buffer_storage(data_block* block): block(block) {
-            block->occurrences++;
+        storage(storage const& other) : ctrl(other.ctrl) {
+            ctrl->_counter++;
         }
 
-        // O(N) strong
-        buffer_storage(T const* data, size_t length, size_t capacity) {
-            if (length <= capacity) {
-                block = static_cast<data_block*>(
-                    operator new(sizeof(data_block) + capacity * sizeof(T),
-                                 static_cast<std::align_val_t>(alignof(data_block))));
+        storage& operator=(storage const& other) {
+            if (&other != this) {
+                storage tmp(other);
+                std::swap(tmp.ctrl, this->ctrl);
+            }
+            return *this;
+        }
 
-                try {
-                    data_copy(data, length, block->data);
-                } catch (...) {
-                    operator delete(block, static_cast<std::align_val_t>(alignof(data_block)));
-                    throw;
-                }
-
-                block->capacity = capacity;
-                block->occurrences = 1;
+        ~storage() {
+            if (ctrl->_counter == 1) {
+                operator delete(ctrl, static_cast<std::align_val_t>(alignof(ctrl)));
             } else {
-                throw std::runtime_error("capacity < length in buffer_storage constructor");
+                ctrl->_counter--;
             }
         }
 
-        // O(1) nothrow
-        void clear(size_t len) {
-            if (block->occurrences == 1) {
-                destruct_data(block->data, len);
-                operator delete(block, static_cast<std::align_val_t>(alignof(data_block)));
-            } else {
-                block->occurrences--;
-            }
+        T& operator[](size_t i) {
+            return ctrl->_data[i];
         }
 
-        // O(1) nothrow
-        T& at(size_t index) const {
-            return block->data[index];
+        T& operator[](size_t i) const {
+            return ctrl->_data[i];
         }
 
-        // O(1) nothrow
-        T* data() const {
-            return block->data;
+        bool is_unique() {
+            return ctrl->_counter == 1;
         }
 
-        // O(1) nothrow
+        T* _data() {
+            return ctrl->_data;
+        }
+
+        T* _data() const {
+            return ctrl->_data;
+        }
+
         size_t capacity() const {
-            return block->capacity;
-        }
-
-        // O(N) strong
-        void own(size_t len) {
-            own(len, block->capacity);
-        }
-
-        // O(N) strong
-        void own(size_t len, size_t new_capacity) {
-            if (len <= new_capacity) {
-                if (block->occurrences > 1 || block->capacity != new_capacity) {
-                    buffer_storage temp(data(), len, new_capacity);
-                    temp.swap(*this);
-                    temp.clear(len);
-                }
-            }
-        }
-
-        void swap(buffer_storage &other) {
-            std::swap(block, other.block);
+            return ctrl->_capacity;
         }
 
     private:
-        data_block *block;
+        control_block* ctrl;
     };
 
-    ptrdiff_t index(const_iterator pos) const {
-        return pos - (is_small ? small_data.begin() : big_data.data());
-    }
-
-    // O(1) nothrow
-    void swap(size_t i, size_t j) {
-        if (is_small) {
-            std::swap(small_data[i], small_data[j]);
-        } else {
-            std::swap(big_data.at(i), big_data.at(j));
-        }
-    }
-
-    // O(N) nothrow
-    static void destruct_data(T *data, size_t len) {
-        destruct_data(data, 0, len);
-    }
-
-    // O(N) nothrow
-    static void destruct_data(T *data, size_t pos, size_t len) {
-        while (len > 0) {
-            data[--len + pos].~T();
-        }
-    }
-
-    // O(from_size) strong
-    static void data_copy(T const *data_from, const size_t from_size, T *data_to) {
-        size_t count = 0;
-        try {
-            for (; count < from_size; count++) {
-                new (&data_to[count]) T(data_from[count]);
-            }
-        } catch (...) {
-            destruct_data(data_to, count);
-            throw;
-        }
-    }
-
-    // O(SMALL_SIZE) basic
-    void swap_smalls(socow_vector &a, socow_vector &b) {
-        size_t minimum = std::min(a.size_, b.size_);
-        for (size_t i = 0; i < minimum; i++) {
-            std::swap(a.small_data[i], b.small_data[i]);
-        }
-
-        if (a.size_ > b.size_) {
-            swap_smalls_tail(a, b);
-        } else {
-            swap_smalls_tail(b, a);
-        }
-
-        std::swap(a.size_, b.size_);
-    }
-
-    void swap_smalls_tail(socow_vector &bigger, socow_vector & smaller) {
-        size_t count = smaller.size_;
-        try {
-            for (; count < bigger.size_; count++) {
-                new (&smaller.small_data[count]) T(bigger.small_data[count]);
-                bigger.small_data[count].~T();
-            }
-        } catch (...) {
-            destruct_data(bigger.small_data.begin(), count, bigger.size_ - count + 1);
-            bigger.size_ = smaller.size_;
-            smaller.size_ = count;
-            throw;
-        }
-    }
-
-    // O(N) strong
-    void swap_small_big(socow_vector &small, socow_vector &big) {
-        buffer_storage temp(big.big_data);
-        big.big_data.clear(big.size_);
-
-        try {
-            data_copy(small.data(), small.size_, big.small_data.begin());
-        } catch (...) {
-            new (&big.big_data) buffer_storage(temp);
-            temp.clear(big.size_);
-            throw;
-        }
-
-        destruct_data(small.data(), small.size());
-        new (&small.big_data) buffer_storage(temp);
-
-        temp.clear(big.size_);
-        std::swap(small.size_, big.size_);
-        std::swap(small.is_small, big.is_small);
-    }
-
-    // O(N) strong
-    void small_to_big(const size_t new_capacity) {
-        buffer_storage temp(small_data.begin(), size_, new_capacity);
-
-        destruct_data(small_data.begin(), size_);
-        new (&big_data) buffer_storage(temp);
-
-        is_small = false;
-
-        temp.clear(size_);
-    }
-
-    // O(N) strong
-    void big_to_small() {
-        buffer_storage temp(big_data);
-
-        big_data.clear(size_);
-        try {
-            data_copy(temp.data(), size_, small_data.begin());
-        } catch (...) {
-            new (&big_data) buffer_storage(temp);
-            temp.clear(size_);
-            throw;
-        }
-
-        is_small = true;
-
-        temp.clear(size_);
-    }
-
-    size_t size_;
-    bool is_small;
+    size_t _size;
     union {
-        std::array<T, SMALL_SIZE> small_data;
-        buffer_storage big_data;
+        T small_storage[SMALL_SIZE];
+        storage big_storage;
     };
 };
+
