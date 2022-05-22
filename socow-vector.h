@@ -177,7 +177,7 @@ struct socow_vector {
     }
 
     iterator insert(const_iterator pos, T const& t) {
-        ptrdiff_t diff = pos - begin();
+        ptrdiff_t diff = pos - my_begin();
         push_back(t);
         for (size_t i = _size - 1; i > diff; --i) {
             std::swap(*(my_begin() + i), *(my_begin() + i - 1));
