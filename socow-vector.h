@@ -23,7 +23,6 @@ struct socow_vector {
         return *this;
     }
 
-    // todo: fix
     ~socow_vector() {
         if (is_small) {
             remove(my_begin(), my_end());
@@ -31,8 +30,8 @@ struct socow_vector {
         }
         if (big_storage.is_unique()) {
             remove(my_begin(), my_end());
-            big_storage.~storage();
         }
+        big_storage.~storage();
     }
 
     T& operator[](size_t i) {
