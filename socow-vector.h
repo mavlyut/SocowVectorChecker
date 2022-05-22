@@ -118,7 +118,7 @@ struct socow_vector {
     }
 
     void swap(socow_vector& other) {
-        if (_size > other._size || !is_small && other.is_small) {
+        if (_size > other._size || (!is_small && other.is_small)) {
             other.swap(*this);
             return;
         }
