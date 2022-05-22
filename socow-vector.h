@@ -303,6 +303,10 @@ private:
             return ctrl->_data;
         }
 
+        T* _data() const {
+            return ctrl->_data;
+        }
+
         size_t capacity() const {
             return ctrl->_capacity;
         }
