@@ -108,7 +108,7 @@ struct socow_vector {
             try {
                 copy(tmp._data(), small_storage, _size);
             } catch (...) {
-                new(&big_storage) storage(tmp);
+                big_storage = storage(tmp);
                 throw;
             }
             remove(tmp._data(), tmp._data() + _size);
