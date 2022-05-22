@@ -102,7 +102,7 @@ struct socow_vector {
             expand_storage(my_begin(), capacity());
         }
     }
-    
+
     void shrink_to_fit() {
         if (!is_small && _size != capacity()) expand_storage(small_storage, _size);
     }
@@ -181,18 +181,16 @@ struct socow_vector {
         return erase(pos, pos + 1);
     }
 
-    // TODO: fix bugs
     iterator erase(const_iterator first, const_iterator last) {
-        ptrdiff_t start = first - my_begin();
-        ptrdiff_t count = last - my_begin();
-        make_copy();
-        for (size_t i = start; i < _size - count; ++i) {
+        ptrdiff_t count = last - first;
+        ptrdiff_t start = first - begin();
+        for (size_t i = start; i < _size - count; i++) {
             std::swap(*(my_begin() + i), *(my_begin() + i + count));
         }
         for (size_t i = 0; i < count; ++i) {
             pop_back();
         }
-        return my_begin() + start;
+        return begin() + start;
     }
 
 private:
@@ -210,7 +208,6 @@ private:
         }
     }
 
-    // copy from `from` to `to` count elements from begin
     void copy(T const* from, T* to, size_t count) {
         size_t i = 0;
         try {
@@ -233,9 +230,8 @@ private:
         }
     }
 
-    // makes _size == new_capacity in `from`; after expand data is big
     void expand_storage(T const* from, size_t new_capacity) {
-        if (!new_capacity) {
+        if (new_capacity == 0) {
             _size = 0;
             return;
         }
@@ -258,7 +254,6 @@ private:
     };
 
     struct storage {
-
         storage() = default;
 
         explicit storage(size_t capacity) :
