@@ -107,13 +107,13 @@ struct socow_vector {
             storage tmp = big_storage;
             big_storage.~storage();
             try {
-                copy(tmp._data(), small_storage, _size);
+                copy(tmp.ctrl->_data, small_storage, _size);
             } catch (...) {
                 // todo: А если мы были неуникальными владельцами буффера почему тут можно ремуватьт?
                 new(&big_storage) storage(tmp);
                 throw;
             }
-            remove(tmp._data(), tmp._data() + _size);
+            remove(tmp.ctrl->_data, tmp.ctrl->_data + _size);
             is_small = true;
         } else if (_size != capacity()) {
             expand_storage(big_storage.ctrl->_data, _size);
