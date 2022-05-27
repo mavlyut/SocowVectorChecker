@@ -78,13 +78,13 @@ struct socow_vector {
             new(begin() + _size) T(tmp);
         } else {
             new(begin() + _size) T(element);
+            _size++;
         }
-        ++_size;
     }
 
     void pop_back() {
         (end() - 1)->~T();
-        --_size;
+        _size--;
     }
 
     bool empty() const {
@@ -116,7 +116,7 @@ struct socow_vector {
             remove(tmp._data(), tmp._data() + _size);
             is_small = true;
         } else if (_size != capacity()) {
-            expand_storage(big_storage._data(), _size);
+            expand_storage(big_storage.ctrl->_data, _size);
         }
     }
 
@@ -130,6 +130,7 @@ struct socow_vector {
             return;
         }
         if (is_small && other.is_small) {
+            // todo: У тебя в большем векторе будут "дырки", если копирование выкинет исключение
             for (size_t i = 0; i < _size; ++i) {
                 std::swap(small_storage[i], other.small_storage[i]);
             }
@@ -158,7 +159,7 @@ struct socow_vector {
     iterator begin() {
         if (is_small) return small_storage;
         make_copy();
-        return big_storage._data();
+        return big_storage.ctrl->_data;
     }
 
     iterator end() {
@@ -166,7 +167,7 @@ struct socow_vector {
     }
 
     const_iterator begin() const {
-        return is_small ? small_storage : big_storage._data();
+        return is_small ? small_storage : big_storage.ctrl->_data;
     }
 
     const_iterator end() const {
@@ -200,7 +201,7 @@ struct socow_vector {
 
 private:
     iterator my_begin() {
-        return is_small ? small_storage : big_storage._data();
+        return is_small ? small_storage : big_storage.ctrl->_data;
     }
 
     iterator my_end() {
@@ -209,7 +210,7 @@ private:
 
     void make_copy() {
         if (!is_small && !big_storage.is_unique()) {
-            expand_storage(big_storage._data(), capacity());
+            expand_storage(big_storage.ctrl->_data, capacity());
         }
     }
 
@@ -246,7 +247,7 @@ private:
             return;
         }
         storage tmp(new_capacity);
-        copy(from, tmp._data(), _size);
+        copy(from, tmp.ctrl->_data, _size);
         if (is_small || big_storage.is_unique()) {
             remove(my_begin(), my_end());
         }
@@ -262,7 +263,7 @@ private:
         size_t _capacity;
         T _data[0];
     };
-
+    
     // todo: remove struct storage
     struct storage {
         storage() = default;
@@ -305,19 +306,10 @@ private:
             return ctrl->_counter == 1;
         }
 
-        T* _data() {
-            return ctrl->_data;
-        }
-
-        T* _data() const {
-            return ctrl->_data;
-        }
-
         size_t capacity() const {
             return ctrl->_capacity;
         }
 
-    private:
         control_block* ctrl;
     };
 
