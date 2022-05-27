@@ -133,18 +133,9 @@ struct socow_vector {
             for (size_t i = 0; i < _size; ++i) {
                 std::swap(small_storage[i], other.small_storage[i]);
             }
-            T tmp[0];
-            memcpy(&small_storage, &tmp, _size);
-            // todo: У тебя в большем векторе будут "дырки", если копирование выкинет исключение
-            try {
-                for (size_t i = _size; i < other._size; ++i) {
-                    new(small_storage + i) T(other.small_storage[i]);
-                    other.small_storage[i].~T();
-                }
-            } catch (...) {
-                remove(my_begin(), my_end());
-                memcpy(&tmp, &small_storage, _size);
-                operator delete(tmp);
+            for (size_t i = _size; i < other._size; ++i) {
+                new(small_storage + i) T(other.small_storage[i]);
+                other.small_storage[i].~T();
             }
         } else if (!is_small && !other.is_small) {
             std::swap(big_storage, other.big_storage);
@@ -222,10 +213,11 @@ private:
         }
     }
 
-    void copy(T const* from, T* to, size_t count) {
-        size_t i = 0;
+    void copy(T const* from, T* to, size_t start, size_t count) {
+        size_t i = start;
+        size_t end = count + start;
         try {
-            while (i < count) {
+            while (i < end) {
                 new(to + i) T(from[i]);
                 ++i;
             }
@@ -233,6 +225,10 @@ private:
             remove(to, to + i);
             throw;
         }
+    }
+
+    void copy(T const* from, T* to, size_t count) {
+        copy(from, to, 0, count);
     }
 
     void remove(T* start, T* end) {
