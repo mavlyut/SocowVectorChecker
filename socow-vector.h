@@ -73,6 +73,7 @@ struct socow_vector {
     void push_back(T const& element) {
         if (_size == capacity()) {
             T tmp = element;
+            // todo: Хочется без лишней копии обойтись
             expand_storage(begin(), capacity() * 2);
             new(begin() + _size) T(tmp);
         } else {
@@ -108,6 +109,7 @@ struct socow_vector {
             try {
                 copy(tmp._data(), small_storage, _size);
             } catch (...) {
+                // todo: А если мы были неуникальными владельцами буффера почему тут можно ремуватьт?
                 new(&big_storage) storage(tmp);
                 throw;
             }
@@ -131,9 +133,15 @@ struct socow_vector {
             for (size_t i = 0; i < _size; ++i) {
                 std::swap(small_storage[i], other.small_storage[i]);
             }
-            for (size_t i = _size; i < other._size; ++i) {
-                new(small_storage + i) T(other.small_storage[i]);
-                other.small_storage[i].~T();
+            T tmp = small_storage;
+            // todo: У тебя в большем векторе будут "дырки", если копирование выкинет исключение
+            try {
+                for (size_t i = _size; i < other._size; ++i) {
+                    new(small_storage + i) T(other.small_storage[i]);
+                    other.small_storage[i].~T();
+                }
+            } catch (...) {
+                small_storage = tmp;
             }
         } else if (!is_small && !other.is_small) {
             std::swap(big_storage, other.big_storage);
@@ -256,9 +264,11 @@ private:
         T _data[0];
     };
 
+    // todo: remove struct storage
     struct storage {
         storage() = default;
 
+        // TODO: remove big line
         explicit storage(size_t capacity) : ctrl(static_cast<control_block*>(operator new(sizeof(control_block) + sizeof(T) * capacity, static_cast<std::align_val_t>(alignof(control_block))))) {
             ctrl->_counter = 1;
             ctrl->_capacity = capacity;
