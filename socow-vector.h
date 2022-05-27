@@ -142,6 +142,7 @@ struct socow_vector {
                     other.small_storage[i].~T();
                 }
             } catch (...) {
+                remove(my_begin(), my_end());
                 memcpy(&tmp, &small_storage, _size);
                 operator delete(tmp);
             }
