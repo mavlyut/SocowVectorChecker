@@ -133,7 +133,8 @@ struct socow_vector {
             for (size_t i = 0; i < _size; ++i) {
                 std::swap(small_storage[i], other.small_storage[i]);
             }
-            T tmp = small_storage;
+            T tmp[0];
+            new (&tmp) T(small_storage);
             // todo: У тебя в большем векторе будут "дырки", если копирование выкинет исключение
             try {
                 for (size_t i = _size; i < other._size; ++i) {
