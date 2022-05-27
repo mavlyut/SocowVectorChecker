@@ -141,7 +141,7 @@ struct socow_vector {
                     other.small_storage[i].~T();
                 }
             } catch (...) {
-                small_storage = tmp;
+                new (&small_storage) T(tmp);
             }
         } else if (!is_small && !other.is_small) {
             std::swap(big_storage, other.big_storage);
