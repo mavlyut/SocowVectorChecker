@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <cassert>
 
+
+#include <iostream>
+
+
 template <typename T, size_t SMALL_SIZE>
 struct socow_vector {
   using iterator = T*;
@@ -74,10 +78,17 @@ struct socow_vector {
 
   void push_back(T const& element) {
     if (_size == capacity()) {
-      T tmp = element;
       // todo: Хочется без лишней копии обойтись
-      expand_storage(begin(), capacity() * 2);
-      new(begin() + _size) T(tmp);
+      storage tmp(2 * capacity());
+      copy(begin(), tmp.ctrl->_data, _size);
+      if (is_small || big_storage.is_unique()) {
+        remove(my_begin(), my_end());
+      }
+      if (!is_small) {
+        big_storage.~storage();
+      }
+      new(&big_storage) storage(tmp);
+      new(begin() + _size) T(element);
     } else {
       new(begin() + _size) T(element);
     }
@@ -114,8 +125,6 @@ struct socow_vector {
         new(&big_storage) storage(tmp);
         throw;
       }
-      // todo: А если мы были неуникальными владельцами буффера почему тут можно ремуватьт?
-      assert(tmp.ctrl->_counter <= 1 && ("" + tmp.ctrl->_counter));
       remove(tmp.ctrl->_data, tmp.ctrl->_data + _size);
       is_small = true;
     } else if (_size != capacity()) {
@@ -134,13 +143,20 @@ struct socow_vector {
     }
     if (is_small && other.is_small) {
       // todo: У тебя в большем векторе будут "дырки", если копирование выкинет исключение
-      for (size_t i = 0; i < _size; ++i) {
-        std::swap(small_storage[i], other.small_storage[i]);
-      }
-      for (size_t i = _size; i < other._size; ++i) {
-        new(small_storage + i) T(other.small_storage[i]);
-        other.small_storage[i].~T();
-      }
+//      T* tmp = other.small_storage;
+//      try {
+        for (size_t i = 0; i < _size; ++i) {
+          std::swap(small_storage[i], other.small_storage[i]);
+        }
+        for (size_t i = _size; i < other._size; ++i) {
+          new(small_storage + i) T(other.small_storage[i]);
+          other.small_storage[i].~T();
+        }
+//      } catch (...) {
+//        new(&other.small_storage) T*(tmp);
+//        tmp.~array();
+//        throw;
+//      }
     } else if (!is_small && !other.is_small) {
       std::swap(big_storage, other.big_storage);
     } else {
