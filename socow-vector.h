@@ -142,7 +142,7 @@ struct socow_vector {
         std::swap(small_storage[i], other.small_storage[i]);
       }
       copy(other.small_storage, small_storage, other._size, _size);
-      remove(begin() + other._size, begin() + _size);
+      remove(my_begin() + other._size, my_begin() + _size);
     } else if (!is_small && !other.is_small) {
       std::swap(big_storage, other.big_storage);
     } else {
