@@ -138,20 +138,10 @@ struct socow_vector {
     }
     if (is_small && other.is_small) {
       // todo: У тебя в большем векторе будут "дырки", если копирование выкинет исключение
-      T tmp = small_storage;
-      try {
-        for (size_t i = 0; i < _size; ++i) {
-          std::swap(small_storage[i], other.small_storage[i]);
-        }
-        for (size_t i = _size; i < other._size; ++i) {
-          new(small_storage + i) T(other.small_storage[i]);
-          other.small_storage[i].~T();
-        }
-      } catch (...) {
-        new(&small_storage) T(tmp);
-        throw;
+      for (size_t i = 0; i < _size; ++i) {
+        std::swap(small_storage[i], other.small_storage[i]);
       }
-
+      copy(other.small_storage, small_storage, other._size, other._size - _size);
     } else if (!is_small && !other.is_small) {
       std::swap(big_storage, other.big_storage);
     } else {
