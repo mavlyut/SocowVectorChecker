@@ -1,7 +1,6 @@
 #pragma once
 #include <cstddef>
 #include <algorithm>
-#include <cassert>
 
 
 #include <iostream>
@@ -89,6 +88,7 @@ struct socow_vector {
       }
       new(&big_storage) storage(tmp);
       new(begin() + _size) T(element);
+      is_small = false;
     } else {
       new(begin() + _size) T(element);
     }
