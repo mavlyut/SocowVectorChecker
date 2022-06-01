@@ -131,24 +131,48 @@ struct socow_vector {
     erase(begin(), end());
   }
 
-  void swap(socow_vector& other) {
-    if (_size > other._size || (!is_small && other.is_small)) {
-      other.swap(*this);
-      return;
-    }
-    // todo: У тебя в большем векторе будут "дырки", если копирование выкинет исключение
-    if (is_small && other.is_small) {
+//  void swap(socow_vector& other) {
+//    if (_size > other._size || (!is_small && other.is_small)) {
+//      other.swap(*this);
+//      return;
+//    }
+//    // todo: У тебя в большем векторе будут "дырки", если копирование выкинет исключение
+//    if (is_small && other.is_small) {
 //      for (size_t i = 0; i < other._size; ++i) {
 //        std::swap(small_storage[i], other.small_storage[i]);
 //      }
 //      copy(other.small_storage, small_storage, other._size, _size);
 //      remove(my_begin() + other._size, my_begin() + _size);
-      for (size_t i = 0; i < other._size; ++i) {
+//    } else if (!is_small && !other.is_small) {
+//      std::swap(big_storage, other.big_storage);
+//    } else {
+//      storage tmp = other.big_storage;
+//      other.big_storage.~storage();
+//      try {
+//        copy(small_storage, other.small_storage, _size);
+//      } catch (...) {
+//        new(&other.big_storage) storage(tmp);
+//        throw;
+//      }
+//      remove(my_begin(), my_end());
+//      new(&big_storage) storage(tmp);
+//    }
+//    std::swap(_size, other._size);
+//    std::swap(is_small, other.is_small);
+//  }
+
+  void swap(socow_vector& other) {
+    if (_size > other._size || (!is_small && other.is_small)) {
+      other.swap(*this);
+      return;
+    }
+    if (is_small && other.is_small) {
+      for (size_t i = 0; i < _size; ++i) {
         std::swap(small_storage[i], other.small_storage[i]);
       }
-      for (size_t i = other._size; i < _size; ++i) {
-        new(other.small_storage + i) T(small_storage[i]);
-        small_storage[i].~T();
+      for (size_t i = _size; i < other._size; ++i) {
+        new(small_storage + i) T(other.small_storage[i]);
+        other.small_storage[i].~T();
       }
     } else if (!is_small && !other.is_small) {
       std::swap(big_storage, other.big_storage);
