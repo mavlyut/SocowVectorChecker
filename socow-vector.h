@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include <algorithm>
 
 template <typename T, size_t SMALL_SIZE>
 struct socow_vector {
@@ -78,8 +79,8 @@ struct socow_vector {
             new(begin() + _size) T(tmp);
         } else {
             new(begin() + _size) T(element);
-            _size++;
         }
+      _size++;
     }
 
     void pop_back() {
@@ -109,10 +110,11 @@ struct socow_vector {
             try {
                 copy(tmp.ctrl->_data, small_storage, _size);
             } catch (...) {
-                // todo: А если мы были неуникальными владельцами буффера почему тут можно ремуватьт?
                 new(&big_storage) storage(tmp);
                 throw;
             }
+            // todo: А если мы были неуникальными владельцами буффера почему тут можно ремуватьт?
+            std::cout << tmp.is_unique();
             remove(tmp.ctrl->_data, tmp.ctrl->_data + _size);
             is_small = true;
         } else if (_size != capacity()) {
@@ -263,7 +265,7 @@ private:
         size_t _capacity;
         T _data[0];
     };
-    
+
     // todo: remove struct storage
     struct storage {
         storage() = default;
