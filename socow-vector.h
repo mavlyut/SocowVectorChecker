@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <algorithm>
+#include <cassert>
 
 template <typename T, size_t SMALL_SIZE>
 struct socow_vector {
@@ -114,7 +115,7 @@ struct socow_vector {
                 throw;
             }
             // todo: А если мы были неуникальными владельцами буффера почему тут можно ремуватьт?
-            std::cout << tmp.is_unique();
+            assert(tmp.is_unique());
             remove(tmp.ctrl->_data, tmp.ctrl->_data + _size);
             is_small = true;
         } else if (_size != capacity()) {
