@@ -75,7 +75,6 @@ struct socow_vector {
     return *(end() - 1);
   }
 
-  // todo: Хочется без лишней копии обойтись
   void push_back(T const& element) {
     if (_size == capacity()) {
       storage tmp(capacity() * 2);
@@ -139,8 +138,8 @@ struct socow_vector {
     }
     if (is_small && other.is_small) {
       // todo: У тебя в большем векторе будут "дырки", если копирование выкинет исключение
-//      T* tmp = other.small_storage;
-//      try {
+      T tmp = small_storage;
+      try {
         for (size_t i = 0; i < _size; ++i) {
           std::swap(small_storage[i], other.small_storage[i]);
         }
@@ -148,11 +147,11 @@ struct socow_vector {
           new(small_storage + i) T(other.small_storage[i]);
           other.small_storage[i].~T();
         }
-//      } catch (...) {
-//        new(&other.small_storage) T*(tmp);
-//        tmp.~array();
-//        throw;
-//      }
+      } catch (...) {
+        new(&small_storage) T(tmp);
+        throw;
+      }
+
     } else if (!is_small && !other.is_small) {
       std::swap(big_storage, other.big_storage);
     } else {
