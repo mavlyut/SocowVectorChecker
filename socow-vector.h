@@ -115,7 +115,7 @@ struct socow_vector {
                 throw;
             }
             // todo: А если мы были неуникальными владельцами буффера почему тут можно ремуватьт?
-            assert(tmp.is_unique());
+            assert(tmp.ctrl->_counter <= 1);
             remove(tmp.ctrl->_data, tmp.ctrl->_data + _size);
             is_small = true;
         } else if (_size != capacity()) {
