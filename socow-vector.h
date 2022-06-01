@@ -136,14 +136,13 @@ struct socow_vector {
       other.swap(*this);
       return;
     }
+    // todo: У тебя в большем векторе будут "дырки", если копирование выкинет исключение
     if (is_small && other.is_small) {
-      // todo: У тебя в большем векторе будут "дырки", если копирование выкинет исключение
-
       for (size_t i = 0; i < _size; ++i) {
         std::swap(small_storage[i], other.small_storage[i]);
       }
       copy(other.small_storage, small_storage, _size, other._size);
-
+      remove(*other.small_storage[_size], other.small_storage + other._size);
     } else if (!is_small && !other.is_small) {
       std::swap(big_storage, other.big_storage);
     } else {
