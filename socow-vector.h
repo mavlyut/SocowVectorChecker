@@ -80,8 +80,7 @@ struct socow_vector {
       // todo: Хочется без лишней копии обойтись
       storage tmp(capacity() * 2);
       copy(begin(), tmp.ctrl->_data, _size);
-//      if (is_small || big_storage.is_unique()) remove(my_begin(), my_end());
-//      if (!is_small) big_storage.~storage();
+      if (!is_small) big_storage.~storage();
       new(&big_storage) storage(tmp);
       is_small = false;
       new(begin() + _size) T(element);
