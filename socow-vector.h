@@ -2,10 +2,6 @@
 #include <cstddef>
 #include <algorithm>
 
-
-#include <iostream>
-
-
 template <typename T, size_t SMALL_SIZE>
 struct socow_vector {
   using iterator = T*;
@@ -267,12 +263,15 @@ private:
     T _data[0];
   };
 
-  // todo: remove struct storage
+  static control_block* get_size(size_t capacity) {
+    std::align_val_t _align = static_cast<std::align_val_t>(alignof(control_block));
+    return static_cast<control_block*>(operator new(sizeof(control_block) + sizeof(T) * capacity, _align));
+  }
+
   struct storage {
     storage() = default;
 
-    // TODO: remove big line
-    explicit storage(size_t capacity) : ctrl(static_cast<control_block*>(operator new(sizeof(control_block) + sizeof(T) * capacity, static_cast<std::align_val_t>(alignof(control_block))))) {
+    explicit storage(size_t capacity) : ctrl(get_size(capacity)) {
       ctrl->_counter = 1;
       ctrl->_capacity = capacity;
     }
@@ -295,14 +294,6 @@ private:
       } else {
         ctrl->_counter--;
       }
-    }
-
-    T& operator[](size_t i) {
-      return ctrl->_data[i];
-    }
-
-    T& operator[](size_t i) const {
-      return ctrl->_data[i];
     }
 
     bool is_unique() {
