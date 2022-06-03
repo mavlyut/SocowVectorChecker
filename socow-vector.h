@@ -312,7 +312,6 @@ private:
       return ctrl->_data;
     }
 
-  private:
     control_block* ctrl;
   };
 
