@@ -15,7 +15,7 @@ struct socow_vector {
 
   socow_vector(socow_vector const& other) : _size(other._size), is_small(other.is_small) {
     if (other.is_small) {
-      copy(other.small_storage, small_storage, other._size);
+      copy_from_begin(other.small_storage, small_storage, other._size);
     } else {
       new(&big_storage) storage(other.big_storage);
     }
@@ -78,7 +78,7 @@ struct socow_vector {
   void push_back(T const& element) {
     if (_size == capacity()) {
       storage tmp(capacity() * 2);
-      copy(begin(), tmp.ctrl->_data, _size);
+      copy_from_begin(begin(), tmp.ctrl->_data, _size);
       new(tmp._data() + _size) T(element);
       if (is_small || big_storage.is_unique()) remove(my_begin(), my_end());
       if (!is_small) big_storage.~storage();
@@ -115,7 +115,7 @@ struct socow_vector {
       storage tmp = big_storage;
       big_storage.~storage();
       try {
-        copy(tmp.ctrl->_data, small_storage, _size);
+        copy_from_begin(tmp.ctrl->_data, small_storage, _size);
       } catch (...) {
         new(&big_storage) storage(tmp);
         throw;
@@ -141,7 +141,7 @@ struct socow_vector {
 //      for (size_t i = 0; i < other._size; ++i) {
 //        std::swap(small_storage[i], other.small_storage[i]);
 //      }
-//      copy(other.small_storage, small_storage, other._size, _size);
+//      copy_in_range(other.small_storage, small_storage, other._size, _size);
 //      remove(my_begin() + other._size, my_begin() + _size);
 //    } else if (!is_small && !other.is_small) {
 //      std::swap(big_storage, other.big_storage);
@@ -149,7 +149,7 @@ struct socow_vector {
 //      storage tmp = other.big_storage;
 //      other.big_storage.~storage();
 //      try {
-//        copy(small_storage, other.small_storage, _size);
+//        copy_from_begin(small_storage, other.small_storage, _size);
 //      } catch (...) {
 //        new(&other.big_storage) storage(tmp);
 //        throw;
@@ -170,17 +170,19 @@ struct socow_vector {
       for (size_t i = 0; i < _size; ++i) {
         std::swap(small_storage[i], other.small_storage[i]);
       }
-      for (size_t i = _size; i < other._size; ++i) {
-        new(small_storage + i) T(other.small_storage[i]);
-        other.small_storage[i].~T();
-      }
+//      for (size_t i = _size; i < other._size; ++i) {
+//        new(small_storage + i) T(other.small_storage[i]);
+//        other.small_storage[i].~T();
+//      }
+      copy_in_range(other.small_storage, small_storage, _size, other._size);
+      remove(other.my_begin() + _size, other.my_end());
     } else if (!is_small && !other.is_small) {
       std::swap(big_storage, other.big_storage);
     } else {
       storage tmp = other.big_storage;
       other.big_storage.~storage();
       try {
-        copy(small_storage, other.small_storage, _size);
+        copy_from_begin(small_storage, other.small_storage, _size);
       } catch (...) {
         new(&other.big_storage) storage(tmp);
         throw;
@@ -250,7 +252,7 @@ private:
     }
   }
 
-  void copy(T const* from, T* to, size_t start, size_t end) {
+  void copy_in_range(T const* from, T* to, size_t start, size_t end) {
     size_t i = start;
     try {
       while (i < end) {
@@ -263,8 +265,8 @@ private:
     }
   }
 
-  void copy(T const* from, T* to, size_t count) {
-    copy(from, to, 0, count);
+  void copy_from_begin(T const* from, T* to, size_t count) {
+    copy_in_range(from, to, 0, count);
   }
 
   void remove(T* start, T* end) {
@@ -282,7 +284,7 @@ private:
       return;
     }
     storage tmp(new_capacity);
-    copy(from, tmp.ctrl->_data, _size);
+    copy_from_begin(from, tmp.ctrl->_data, _size);
     if (is_small || big_storage.is_unique()) {
       remove(my_begin(), my_end());
     }
