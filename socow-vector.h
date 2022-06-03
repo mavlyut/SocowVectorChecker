@@ -265,7 +265,7 @@ private:
 
   static control_block* get_size(size_t capacity) {
     std::align_val_t _align = static_cast<std::align_val_t>(alignof(control_block));
-    return static_cast<control_block*>(operator new(sizeof(control_block) + sizeof(T) * capacity, _align));
+    return operator new(sizeof(control_block) + sizeof(T) * capacity, _align);
   }
 
   struct storage {
@@ -312,6 +312,7 @@ private:
       return ctrl->_data;
     }
 
+  private:
     control_block* ctrl;
   };
 
