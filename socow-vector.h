@@ -30,7 +30,7 @@ struct socow_vector {
       remove(my_begin(), my_end());
       return;
     }
-    if (big_storage.is_unique()) {
+    if (big_storage.ctrl->is_unique()) {
       remove(my_begin(), my_end());
     }
     big_storage.~storage();
@@ -76,8 +76,8 @@ struct socow_vector {
     if (_size == capacity()) {
       storage tmp(capacity() * 2);
       copy_from_begin(begin(), tmp.ctrl->_data, _size);
-      new(tmp._data() + _size) T(element);
-      if (is_small || big_storage.is_unique()) remove(my_begin(), my_end());
+      new(tmp.ctrl->_data + _size) T(element);
+      if (is_small || big_storage.ctrl->is_unique()) remove(my_begin(), my_end());
       if (!is_small) big_storage.~storage();
       new(&big_storage) storage(tmp);
       is_small = false;
@@ -97,7 +97,7 @@ struct socow_vector {
   }
 
   size_t capacity() const {
-    return is_small ? SMALL_SIZE : big_storage.capacity();
+    return is_small ? SMALL_SIZE : big_storage.ctrl->_capacity;
   }
 
   void reserve(size_t new_capacity) {
@@ -210,7 +210,7 @@ private:
   }
 
   void make_copy() {
-    if (!is_small && !big_storage.is_unique()) {
+    if (!is_small && !big_storage.ctrl->is_unique()) {
       expand_storage(big_storage.ctrl->_data, capacity());
     }
   }
@@ -248,7 +248,7 @@ private:
     }
     storage tmp(new_capacity);
     copy_from_begin(from, tmp.ctrl->_data, _size);
-    if (is_small || big_storage.is_unique()) {
+    if (is_small || big_storage.ctrl->is_unique()) {
       remove(my_begin(), my_end());
     }
     if (!is_small) {
@@ -262,6 +262,10 @@ private:
     size_t _counter;
     size_t _capacity;
     T _data[0];
+
+    bool is_unique() {
+      return _counter == 1;
+    }
   };
 
   static control_block* get_size(size_t capacity) {
@@ -294,22 +298,6 @@ private:
       } else {
         ctrl->_counter--;
       }
-    }
-
-    bool is_unique() {
-      return ctrl->_counter == 1;
-    }
-
-    size_t capacity() const {
-      return ctrl->_capacity;
-    }
-
-    T* _data() {
-      return ctrl->_data;
-    }
-
-    T* _data() const {
-      return ctrl->_data;
     }
 
     control_block* ctrl;
