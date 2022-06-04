@@ -284,14 +284,6 @@ private:
       ctrl->_counter++;
     }
 
-    storage& operator=(storage const& other) {
-      if (&other != this) {
-        storage tmp(other);
-        std::swap(tmp.ctrl, this->ctrl);
-      }
-      return *this;
-    }
-
     ~storage() {
       if (ctrl->_counter == 1) {
         operator delete(ctrl, static_cast<std::align_val_t>(alignof(ctrl)));
