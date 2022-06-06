@@ -81,7 +81,7 @@ struct socow_vector {
         copy_from_begin(my_begin(), tmp.ctrl->_data, _size);
       } catch (...) {
         tmp.~storage();
-        assert(tmp.ctrl->_counter > 1);
+        if (tmp.is_unique()) remove(tmp._data(), tmp._data() + _size);
         throw;
       }
       new(tmp._data() + _size) T(element);
