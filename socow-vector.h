@@ -30,7 +30,7 @@ struct socow_vector {
       remove(my_begin(), my_end());
       return;
     }
-    if (big_storage.ctrl->is_unique()) {
+    if (big_storage.ctrl->_counter == 1) {
       remove(my_begin(), my_end());
     }
     big_storage.~storage();
@@ -75,9 +75,9 @@ struct socow_vector {
   void push_back(T const& element) {
     if (_size == capacity()) {
       storage tmp(capacity() * 2);
-      copy_from_begin(begin(), tmp.ctrl->_data, _size);
+      copy_from_begin(my_begin(), tmp.ctrl->_data, _size);
       new(tmp.ctrl->_data + _size) T(element);
-      if (is_small || big_storage.ctrl->is_unique()) remove(my_begin(), my_end());
+      if (is_small || big_storage.ctrl->_counter == 1) remove(my_begin(), my_end());
       if (!is_small) big_storage.~storage();
       new(&big_storage) storage(tmp);
       is_small = false;
@@ -200,7 +200,7 @@ struct socow_vector {
     return begin() + start;
   }
 
-private:
+//private:
   iterator my_begin() {
     return is_small ? small_storage : big_storage.ctrl->_data;
   }
@@ -210,7 +210,7 @@ private:
   }
 
   void make_copy() {
-    if (!is_small && !big_storage.ctrl->is_unique()) {
+    if (!is_small && !big_storage.ctrl->_counter == 1) {
       expand_storage(big_storage.ctrl->_data, capacity());
     }
   }
@@ -248,7 +248,7 @@ private:
     }
     storage tmp(new_capacity);
     copy_from_begin(from, tmp.ctrl->_data, _size);
-    if (is_small || big_storage.ctrl->is_unique()) {
+    if (is_small || big_storage.ctrl->_counter == 1) {
       remove(my_begin(), my_end());
     }
     if (!is_small) {
@@ -262,10 +262,6 @@ private:
     size_t _counter;
     size_t _capacity;
     T _data[0];
-
-    bool is_unique() {
-      return _counter == 1;
-    }
   };
 
   static control_block* get_size(size_t capacity) {
@@ -273,8 +269,6 @@ private:
   }
 
   struct storage {
-    storage() = default;
-
     explicit storage(size_t capacity) : ctrl(get_size(capacity)) {
       ctrl->_counter = 1;
       ctrl->_capacity = capacity;
