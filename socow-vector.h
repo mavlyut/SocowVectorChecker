@@ -101,8 +101,9 @@ struct socow_vector {
   }
 
   void reserve(size_t new_capacity) {
+    if (new_capacity <= capacity()) return;
     if ((is_small && new_capacity > SMALL_SIZE) || !is_small) {
-      expand_storage(my_begin(), std::max<size_t>(new_capacity, capacity()));
+      expand_storage(my_begin(), new_capacity);
     }
   }
 
