@@ -6,7 +6,7 @@ template <typename T, size_t SMALL_SIZE>
 struct socow_vector {
   using iterator = T*;
   using const_iterator = T const*;
-  static const size_t size_of_T = sizeof(T);
+  static constexpr size_t size_of_T = sizeof(T);
 
   socow_vector() : size_(0), is_small(true) {}
 
@@ -317,8 +317,8 @@ private:
 
   bool is_small;
   size_t size_;
-  static const std::align_val_t _align = static_cast<std::align_val_t>(alignof(control_block));
-  static const size_t size_of_ctrl_block = sizeof(control_block);
+  static constexpr std::align_val_t _align = static_cast<std::align_val_t>(alignof(control_block));
+  static constexpr size_t size_of_ctrl_block = sizeof(control_block);
   union {
     T small_storage[SMALL_SIZE];
     storage big_storage;
