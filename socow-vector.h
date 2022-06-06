@@ -117,7 +117,7 @@ struct socow_vector {
         new(&big_storage) storage(tmp);
         throw;
       }
-      remove(tmp.ctrl->data_, tmp.ctrl->data_ + size_);
+      if (tmp.is_unique()) remove(tmp.ctrl->data_, tmp.ctrl->data_ + size_);
       is_small = true;
     } else if (size_ != capacity()) {
       expand_storage(big_storage.ctrl->data_, size_);
