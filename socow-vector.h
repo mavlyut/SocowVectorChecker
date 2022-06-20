@@ -242,10 +242,6 @@ private:
   }
 
   void expand_storage(T const* from, size_t new_capacity) {
-    if (new_capacity == 0) {
-      size_ = 0;
-      return;
-    }
     storage tmp(new_capacity);
     copy_from_begin(from, tmp.ctrl->data_, size_);
     if (is_small || big_storage.is_unique()) {
