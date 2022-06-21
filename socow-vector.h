@@ -30,7 +30,7 @@ struct socow_vector {
       remove(my_begin(), my_end());
       return;
     }
-    if (big_storage.is_unique()) {
+    if (big_storage.ctrl->counter_ == 1) {
       remove(my_begin(), my_end());
     }
     big_storage.~storage();
@@ -76,8 +76,8 @@ struct socow_vector {
     if (size_ == capacity()) {
       storage tmp(capacity() * 2);
       copy_from_begin(my_begin(), tmp.ctrl->data_, size_);
-      new(tmp.data_() + size_) T(element);
-      if (is_small || big_storage.is_unique()) remove(my_begin(), my_end());
+      new(tmp.ctrl->data_ + size_) T(element);
+      if (is_small || big_storage.ctrl->counter_ == 1) remove(my_begin(), my_end());
       if (!is_small) big_storage.~storage();
       new(&big_storage) storage(tmp);
       is_small = false;
@@ -101,7 +101,7 @@ struct socow_vector {
   }
 
   void reserve(size_t new_capacity) {
-    if ((!is_small && !big_storage.is_unique()) || new_capacity > capacity()) {
+    if ((!is_small && big_storage.ctrl->counter_ != 1) || new_capacity > capacity()) {
       expand_storage(my_begin(), std::max<size_t>(new_capacity, capacity()));
     }
   }
@@ -117,7 +117,7 @@ struct socow_vector {
         new(&big_storage) storage(tmp);
         throw;
       }
-      if (tmp.is_unique()) remove(tmp.ctrl->data_, tmp.ctrl->data_ + size_);
+      if (tmp.ctrl->counter_ == 1) remove(tmp.ctrl->data_, tmp.ctrl->data_ + size_);
       is_small = true;
     } else if (size_ != capacity()) {
       expand_storage(big_storage.ctrl->data_, size_);
@@ -210,7 +210,7 @@ private:
   }
 
   void make_copy() {
-    if (!is_small && !big_storage.is_unique()) {
+    if (!is_small && big_storage.ctrl->counter_ != 1) {
       expand_storage(big_storage.ctrl->data_, capacity());
     }
   }
@@ -244,7 +244,7 @@ private:
   void expand_storage(T const* from, size_t new_capacity) {
     storage tmp(new_capacity);
     copy_from_begin(from, tmp.ctrl->data_, size_);
-    if (is_small || big_storage.is_unique()) {
+    if (is_small || big_storage.ctrl->counter_ == 1) {
       remove(my_begin(), my_end());
     }
     if (!is_small) {
@@ -292,20 +292,8 @@ private:
       }
     }
 
-    bool is_unique() {
-      return ctrl->counter_ == 1;
-    }
-
     size_t capacity() const {
       return ctrl->capacity_;
-    }
-
-    T* data_() {
-      return ctrl->data_;
-    }
-
-    T* data_() const {
-      return ctrl->data_;
     }
 
     control_block* ctrl;
