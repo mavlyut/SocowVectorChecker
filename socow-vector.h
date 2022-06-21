@@ -75,12 +75,7 @@ struct socow_vector {
   void push_back(T const& element) {
     if (size_ == capacity()) {
       storage tmp(capacity() * 2);
-      try {
-        copy_from_begin(my_begin(), tmp.ctrl->data_, size_);
-      } catch (...) {
-        remove(tmp.data_(), tmp.data_() + tmp.capacity());
-        throw;
-      }
+      copy_from_begin(my_begin(), tmp.ctrl->data_, size_);
       new(tmp.data_() + size_) T(element);
       if (is_small || big_storage.is_unique()) remove(my_begin(), my_end());
       if (!is_small) big_storage.~storage();
