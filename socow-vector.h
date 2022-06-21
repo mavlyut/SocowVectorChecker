@@ -97,7 +97,7 @@ struct socow_vector {
   }
 
   size_t capacity() const {
-    return is_small ? SMALL_SIZE : big_storage.capacity();
+    return is_small ? SMALL_SIZE : big_storage.ctrl->capacity_;
   }
 
   void reserve(size_t new_capacity) {
@@ -292,10 +292,6 @@ private:
       }
     }
 
-    size_t capacity() const {
-      return ctrl->capacity_;
-    }
-    
     control_block* ctrl;
   };
 
