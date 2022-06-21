@@ -295,7 +295,7 @@ private:
     size_t capacity() const {
       return ctrl->capacity_;
     }
-
+    
     control_block* ctrl;
   };
 
