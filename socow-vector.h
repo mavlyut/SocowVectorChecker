@@ -26,14 +26,15 @@ struct socow_vector {
   }
 
   ~socow_vector() {
-    if (is_small) {
-      remove(my_begin(), my_end());
-      return;
-    }
-    if (big_storage.ctrl->counter_ == 1) {
-      remove(my_begin(), my_end());
-    }
-    big_storage.~storage();
+//    if (is_small) {
+//      remove(my_begin(), my_end());
+//      return;
+//    }
+//    if (big_storage.ctrl->counter_ == 1) {
+//      remove(my_begin(), my_end());
+//    }
+//    big_storage.~storage();
+    clear();
   }
 
   T& operator[](size_t i) {
@@ -125,7 +126,14 @@ struct socow_vector {
   }
 
   void clear() {
-    erase(begin(), end());
+    if (!is_small && big_storage.ctrl->counter_ > 1) {
+      big_storage.ctrl->counter_--;
+      big_storage.ctrl = new (static_cast<control_block*>(operator new(sizeof(control_block) + capacity() * sizeof(T)))) control_block(capacity());
+    } else {
+      remove(data(), data() + size_);
+    }
+    size_ = 0;
+//    erase(begin(), end());
   }
 
   void swap(socow_vector& other) {
@@ -265,7 +273,7 @@ private:
   }
 
   struct storage {
-    storage() = default;
+    friend struct socow_vector<T, SMALL_SIZE>;
 
     explicit storage(size_t capacity) : ctrl(get_size(capacity)) {
       ctrl->counter_ = 1;
@@ -273,15 +281,8 @@ private:
     }
 
     storage(storage const& other) : ctrl(other.ctrl) {
-      ctrl->counter_++;
-    }
-
-    storage& operator=(storage const& other) {
-      if (&other != this) {
-        storage tmp(other);
-        std::swap(tmp.ctrl, this->ctrl);
-      }
-      return *this;
+      ctrl->counter_ = other.ctrl->counter_ + 1;
+      ctrl->capacity_ = other.ctrl->capacity_;
     }
 
     ~storage() {
