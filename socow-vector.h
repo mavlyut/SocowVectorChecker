@@ -6,7 +6,6 @@ template <typename T, size_t SMALL_SIZE>
 struct socow_vector {
   using iterator = T*;
   using const_iterator = T const*;
-  static constexpr size_t size_of_T = sizeof(T);
 
   socow_vector() : size_(0), is_small(true) {}
 
@@ -26,15 +25,14 @@ struct socow_vector {
   }
 
   ~socow_vector() {
-//    if (is_small) {
-//      remove(my_begin(), my_end());
-//      return;
-//    }
-//    if (big_storage.ctrl->counter_ == 1) {
-//      remove(my_begin(), my_end());
-//    }
-//    big_storage.~storage();
-    clear();
+    if (is_small) {
+      remove(my_begin(), my_end());
+      return;
+    }
+    if (big_storage.ctrl->counter_ == 1) {
+      remove(my_begin(), my_end());
+    }
+    big_storage.~storage();
   }
 
   T& operator[](size_t i) {
@@ -126,14 +124,7 @@ struct socow_vector {
   }
 
   void clear() {
-    if (!is_small && big_storage.ctrl->counter_ > 1) {
-      big_storage.ctrl->counter_--;
-      big_storage.ctrl = new (static_cast<control_block*>(operator new(sizeof(control_block) + capacity() * sizeof(T)))) control_block(capacity());
-    } else {
-      remove(data(), data() + size_);
-    }
-    size_ = 0;
-//    erase(begin(), end());
+    erase(begin(), end());
   }
 
   void swap(socow_vector& other) {
@@ -269,11 +260,11 @@ private:
   };
 
   static control_block* get_size(size_t capacity) {
-    return static_cast<control_block*>(operator new(size_of_ctrl_block + size_of_T * capacity, _align));
+    return reinterpret_cast<control_block*>(operator new(sizeof(control_block) + sizeof(T) * capacity));
   }
 
   struct storage {
-    friend struct socow_vector<T, SMALL_SIZE>;
+    storage() = default;
 
     explicit storage(size_t capacity) : ctrl(get_size(capacity)) {
       ctrl->counter_ = 1;
@@ -281,13 +272,20 @@ private:
     }
 
     storage(storage const& other) : ctrl(other.ctrl) {
-      ctrl->counter_ = other.ctrl->counter_ + 1;
-      ctrl->capacity_ = other.ctrl->capacity_;
+      ctrl->counter_++;
+    }
+
+    storage& operator=(storage const& other) {
+      if (&other != this) {
+        storage tmp(other);
+        std::swap(tmp.ctrl, this->ctrl);
+      }
+      return *this;
     }
 
     ~storage() {
       if (ctrl->counter_ == 1) {
-        operator delete(ctrl, static_cast<std::align_val_t>(alignof(ctrl)));
+        operator delete(ctrl);
       } else {
         ctrl->counter_--;
       }
@@ -298,8 +296,6 @@ private:
 
   bool is_small;
   size_t size_;
-  static constexpr std::align_val_t _align = static_cast<std::align_val_t>(alignof(control_block));
-  static constexpr size_t size_of_ctrl_block = sizeof(control_block);
   union {
     T small_storage[SMALL_SIZE];
     storage big_storage;
