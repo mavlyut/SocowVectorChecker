@@ -74,7 +74,7 @@ struct socow_vector {
 
   void push_back(T const& element) {
     if (size_ == capacity()) {
-      storage* tmp = make_c(capacity() * 2);
+      storage* tmp = copy_storage_with_fixed_capacity(capacity() * 2);
       try {
         new(tmp->data_ + size_) T(element);
       } catch (...) {
@@ -105,7 +105,7 @@ struct socow_vector {
   }
 
   void reserve(size_t new_capacity) {
-    if ((!is_small && big_storage->counter_ != 1) || new_capacity > capacity()) {
+    if ((!is_small && big_storage->is_not_unique()) || new_capacity > capacity()) {
       expand_storage(std::max<size_t>(new_capacity, capacity()));
     }
   }
@@ -166,7 +166,7 @@ struct socow_vector {
 
   iterator begin() {
     if (is_small) return small_storage;
-    if (!is_small && (*big_storage)) {
+    if (!is_small && big_storage->is_not_unique()) {
       expand_storage(capacity());
     }
     return big_storage->data_;
@@ -245,7 +245,7 @@ private:
   }
 
   void expand_storage(size_t new_capacity) {
-    storage* tmp = make_c(new_capacity);
+    storage* tmp = copy_storage_with_fixed_capacity(new_capacity);
     this->~socow_vector();
     big_storage = tmp;
     is_small = false;
@@ -256,27 +256,27 @@ private:
     size_t capacity_;
     T data_[0];
     
-    explicit storage(size_t n = 0) : counter_(1), capacity_(n) {}
+    explicit storage(size_t n) : counter_(1), capacity_(n) {}
 
     bool dec() {
       counter_--;
       return counter_ == 0;
     }
 
-    operator bool() const {
+    bool is_not_unique() const {
       return counter_ > 1;
     }
   };
 
-  storage* make_n(size_t n) {
-    storage* ans = static_cast<storage*>(operator new(sizeof(storage) + n * sizeof(T)));
-    ans->capacity_ = n;
-    ans->counter_ = 1;
+  storage* make_new_storage_with_fixed_capacity(size_t new_capacity) {
+    storage* ans =
+      new (static_cast<storage*>(operator new(sizeof(storage) + new_capacity * sizeof(T))))
+      storage(new_capacity);
     return ans;
   }
 
-  storage* make_c(size_t n) {
-    storage* ans = make_n(n);
+  storage* copy_storage_with_fixed_capacity(size_t new_capacity) {
+    storage* ans = make_new_storage_with_fixed_capacity(new_capacity);
     try {
       copy_from_begin(my_begin(), ans->data_, size_);
     } catch (...) {
@@ -293,4 +293,3 @@ private:
     storage* big_storage;
   };
 };
-
