@@ -13,7 +13,8 @@ struct socow_vector {
     if (other.is_small) {
       copy_from_begin(other.small_storage, small_storage, other.size_);
     } else {
-      new(&big_storage) storage(other.big_storage);
+      big_storage = other.big_storage;
+      big_storage->counter_++;
     }
   }
 
@@ -29,10 +30,10 @@ struct socow_vector {
       remove(my_begin(), my_end());
       return;
     }
-    if (big_storage.ctrl->counter_ == 1) {
+    if (big_storage->dec()) {
       remove(my_begin(), my_end());
+      operator delete(big_storage);
     }
-    big_storage.~storage();
   }
 
   T& operator[](size_t i) {
@@ -73,12 +74,16 @@ struct socow_vector {
 
   void push_back(T const& element) {
     if (size_ == capacity()) {
-      storage tmp(capacity() * 2);
-      copy_from_begin(my_begin(), tmp.ctrl->data_, size_);
-      new(tmp.ctrl->data_ + size_) T(element);
-      if (is_small || big_storage.ctrl->counter_ == 1) remove(my_begin(), my_end());
-      if (!is_small) big_storage.~storage();
-      new(&big_storage) storage(tmp);
+      storage* tmp = make_c(capacity() * 2);
+      try {
+        new(tmp->data_ + size_) T(element);
+      } catch (...) {
+        remove(tmp->data_, tmp->data_ + size_);
+        operator delete(tmp);
+        throw;
+      }
+      this->~socow_vector();
+      big_storage = tmp;
       is_small = false;
     } else {
       new(begin() + size_) T(element);
@@ -96,30 +101,33 @@ struct socow_vector {
   }
 
   size_t capacity() const {
-    return is_small ? SMALL_SIZE : big_storage.ctrl->capacity_;
+    return is_small ? SMALL_SIZE : big_storage->capacity_;
   }
 
   void reserve(size_t new_capacity) {
-    if ((!is_small && big_storage.ctrl->counter_ != 1) || new_capacity > capacity()) {
-      expand_storage(my_begin(), std::max<size_t>(new_capacity, capacity()));
+    if ((!is_small && big_storage->counter_ != 1) || new_capacity > capacity()) {
+      expand_storage(std::max<size_t>(new_capacity, capacity()));
     }
   }
 
   void shrink_to_fit() {
     if (is_small) return;
     if (size_ <= SMALL_SIZE) {
-      storage tmp = big_storage;
-      big_storage.~storage();
+      storage* tmp = big_storage;
+      big_storage = nullptr;
       try {
-        copy_from_begin(tmp.ctrl->data_, small_storage, size_);
+        copy_from_begin(tmp->data_, small_storage, size_);
       } catch (...) {
-        new(&big_storage) storage(tmp);
+        big_storage = tmp;
         throw;
       }
-      if (tmp.ctrl->counter_ == 1) remove(tmp.ctrl->data_, tmp.ctrl->data_ + size_);
+      if (tmp->dec()) {
+        remove(tmp->data_, tmp->data_ + size_);
+        operator delete(tmp);
+      }
       is_small = true;
     } else if (size_ != capacity()) {
-      expand_storage(big_storage.ctrl->data_, size_);
+      expand_storage(size_);
     }
   }
 
@@ -141,16 +149,16 @@ struct socow_vector {
     } else if (!is_small && !other.is_small) {
       std::swap(big_storage, other.big_storage);
     } else {
-      storage tmp = other.big_storage;
-      other.big_storage.~storage();
+      storage* tmp = other.big_storage;
+      other.big_storage = nullptr;
       try {
         copy_from_begin(small_storage, other.small_storage, size_);
       } catch (...) {
-        new(&other.big_storage) storage(tmp);
+        other.big_storage = tmp;
         throw;
       }
       remove(my_begin(), my_end());
-      new(&big_storage) storage(tmp);
+      big_storage = tmp;
     }
     std::swap(size_, other.size_);
     std::swap(is_small, other.is_small);
@@ -158,8 +166,10 @@ struct socow_vector {
 
   iterator begin() {
     if (is_small) return small_storage;
-    make_copy();
-    return big_storage.ctrl->data_;
+    if (!is_small && (*big_storage)) {
+      expand_storage(capacity());
+    }
+    return big_storage->data_;
   }
 
   iterator end() {
@@ -167,7 +177,7 @@ struct socow_vector {
   }
 
   const_iterator begin() const {
-    return is_small ? small_storage : big_storage.ctrl->data_;
+    return is_small ? small_storage : big_storage->data_;
   }
 
   const_iterator end() const {
@@ -201,17 +211,11 @@ struct socow_vector {
 
 private:
   iterator my_begin() {
-    return is_small ? small_storage : big_storage.ctrl->data_;
+    return is_small ? small_storage : big_storage->data_;
   }
 
   iterator my_end() {
     return my_begin() + size_;
-  }
-
-  void make_copy() {
-    if (!is_small && big_storage.ctrl->counter_ != 1) {
-      expand_storage(big_storage.ctrl->data_, capacity());
-    }
   }
 
   void copy_in_range(T const* from, T* to, size_t start, size_t end) {
@@ -240,65 +244,53 @@ private:
     }
   }
 
-  void expand_storage(T const* from, size_t new_capacity) {
-    storage tmp(new_capacity);
-    copy_from_begin(from, tmp.ctrl->data_, size_);
-    if (is_small || big_storage.ctrl->counter_ == 1) {
-      remove(my_begin(), my_end());
-    }
-    if (!is_small) {
-      big_storage.~storage();
-    }
-    new(&big_storage) storage(tmp);
+  void expand_storage(size_t new_capacity) {
+    storage* tmp = make_c(new_capacity);
+    this->~socow_vector();
+    big_storage = tmp;
     is_small = false;
   }
 
-  struct control_block {
+  struct storage {
     size_t counter_;
     size_t capacity_;
     T data_[0];
+    
+    explicit storage(size_t n = 0) : counter_(1), capacity_(n) {}
+
+    bool dec() {
+      counter_--;
+      return counter_ == 0;
+    }
+
+    operator bool() const {
+      return counter_ > 1;
+    }
   };
 
-  static control_block* get_size(size_t capacity) {
-    return reinterpret_cast<control_block*>(operator new(sizeof(control_block) + sizeof(T) * capacity));
+  storage* make_n(size_t n) {
+    storage* ans = static_cast<storage*>(operator new(sizeof(storage) + n * sizeof(T)));
+    ans->capacity_ = n;
+    ans->counter_ = 1;
+    return ans;
   }
 
-  struct storage {
-    storage() = default;
-
-    explicit storage(size_t capacity) : ctrl(get_size(capacity)) {
-      ctrl->counter_ = 1;
-      ctrl->capacity_ = capacity;
+  storage* make_c(size_t n) {
+    storage* ans = make_n(n);
+    try {
+      copy_from_begin(my_begin(), ans->data_, size_);
+    } catch (...) {
+      operator delete(ans);
+      throw;
     }
-
-    storage(storage const& other) : ctrl(other.ctrl) {
-      ctrl->counter_++;
-    }
-
-    storage& operator=(storage const& other) {
-      if (&other != this) {
-        storage tmp(other);
-        std::swap(tmp.ctrl, this->ctrl);
-      }
-      return *this;
-    }
-
-    ~storage() {
-      if (ctrl->counter_ == 1) {
-        operator delete(ctrl);
-      } else {
-        ctrl->counter_--;
-      }
-    }
-
-    control_block* ctrl;
-  };
+    return ans;
+  }
 
   bool is_small;
   size_t size_;
   union {
     T small_storage[SMALL_SIZE];
-    storage big_storage;
+    storage* big_storage;
   };
 };
 
