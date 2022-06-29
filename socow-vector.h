@@ -268,7 +268,7 @@ private:
     }
   };
 
-  storage* make_new_storage_with_fixed_capacity(size_t new_capacity) {
+  static storage* make_new_storage_with_fixed_capacity(size_t new_capacity) {
     storage* ans =
       new (static_cast<storage*>(operator new(sizeof(storage) + new_capacity * sizeof(T))))
       storage(new_capacity);
@@ -293,3 +293,4 @@ private:
     storage* big_storage;
   };
 };
+
